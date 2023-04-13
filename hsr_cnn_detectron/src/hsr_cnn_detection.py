@@ -19,7 +19,8 @@ import numpy as np
 import cv2
 import message_filters
 from cv_bridge import CvBridge, CvBridgeError
-from sensor_msgs.msg import Image, PointCloud, CameraInfo
+from std_msgs.msg import Header
+from sensor_msgs.msg import Image, PointCloud, CameraInfo, PointCloud2, PointField
 import rospy
 import torch, detectron2
 from detectron2.utils.logger import setup_logger
@@ -31,8 +32,7 @@ from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog, DatasetCatalog
 import open3d as o3d
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
+from open3d_ros_helper import open3d_ros_helper as orh
 
 
 class hsr_cnn_detection(object):
@@ -47,7 +47,7 @@ class hsr_cnn_detection(object):
         self.bridge = CvBridge()
         self.loop_rate = rospy.Rate(1)
         self.segment_publisher = rospy.Publisher('segmented', Image, queue_size=10)
-        self.point_publisher = rospy.Publisher('segmented_point', PointCloud, queue_size=10)
+        self.point_publisher = rospy.Publisher('segmented_point_ros', PointCloud2, queue_size=10)
         self.image_sub = message_filters.Subscriber('/hsrb/head_rgbd_sensor/rgb/image_raw', Image)
         self.depth_sub = message_filters.Subscriber('/hsrb/head_rgbd_sensor/depth_registered/image_raw', Image)
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=100, slop=0.02)
@@ -62,32 +62,73 @@ class hsr_cnn_detection(object):
         self.detectron_predictor = None
         self.detectron_output = None
         self.detectron_visualizer = None
+        x = PointField()
+        self.boxes = None
+        self.mask = None
+        # self.FIELDS_XYZ = [
+        #     PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
+        #     PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
+        #     PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
+        # ]
+        # self.FIELDS_XYZRGB = self.FIELDS_XYZ + \
+        #     [PointField(name='rgb', offset=12, datatype=PointField.UINT32, count=1)]
 
 
     def project_2d_3d(self, image_msg, depth_msg):
         rospy.loginfo('Message Received')
-        self.rgb_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
+        # self.rgb_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
+        self.rgb_image = self.bridge.imgmsg_to_cv2(image_msg)
         self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='8UC1')
         # self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.depth_image))
         self.detectron_predictor = DefaultPredictor(self.detectron_cfg)
         self.detectron_output = self.detectron_predictor(self.rgb_image)
-        # rospy.loginfo(self.detectron_output['instances'])
-        self.detectron_visualizer = Visualizer(self.rgb_image[:, :, ::-1], MetadataCatalog.get(self.detectron_cfg.DATASETS.TRAIN[0]), scale=1.2)
-        self.detectron_output = self.detectron_visualizer.draw_instance_predictions(self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].to('cpu'))
-        # [self.detectron_output['instances'].pred_classes == 31]
-        self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.detectron_output.get_image()[:, :, ::-1]))
-        # plt.imshow(self.rgb_image)
-        # plt.show()
-        # cv2.imshow('x', self.rgb_image)
-        self.rgb_image = self.rgb_image/255.0
-        self.rgb_image = o3d.geometry.Image(self.rgb_image.astype(np.float32))
+        self.boxes = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_boxes
+        self.boxes = list(self.boxes)[0].detach().cpu().numpy()
+        self.mask = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_masks
+        self.mask = list(self.mask)[0].detach().cpu().numpy()
+        # self.mask = np.reshape(self.mask*255, (640, 480)).astype(np.uint8)
+        self.mask = cv2.cvtColor((self.mask*255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+        self.rgb_image = cv2.bitwise_and(self.rgb_image, self.mask)
+        self.depth_image = cv2.bitwise_and(self.depth_image, self.mask[:,:,0])
+        # cv2.imshow('image', self.mask)
+        # for x in self.mask:
+        #     print(x)
+        # print(self.mask.shape)
+        # print(self.boxes)
+        (x, y) = (int(self.boxes[0]), int(self.boxes[1]))
+        (w, h) = (int(self.boxes[2])-int(self.boxes[0]), int(self.boxes[3])-int(self.boxes[1]))
+        # self.rgb_image = self.rgb_image[100:500, 100:500]
+        # self.depth_image = self.depth_image[100:500, 100:500]
+        # self.pinhole_camera_intrinsic.set_intrinsics(400, 400, 533.8970730178461, 534.3109677231259, 321.0284419169324, 241.1102341748379)
+        # self.rgb_image = cv2.resize(self.rgb_image, (640, 480), interpolation= cv2.INTER_LINEAR)
+        # self.depth_image = cv2.resize(self.depth_image, (640, 480), interpolation= cv2.INTER_LINEAR)
+        # self.rgb_image = self.rgb_image
+        # self.depth_image = self.depth_image
+        self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.mask))
+        self.rgb_image = o3d.geometry.Image(self.rgb_image)
         self.depth_image = o3d.geometry.Image(self.depth_image)
-        self.rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(self.rgb_image, self.depth_image)
+        self.rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(self.rgb_image, self.depth_image, depth_scale=1, convert_rgb_to_intensity=False)
         self.pcd = o3d.geometry.PointCloud.create_from_rgbd_image(self.rgbd, self.pinhole_camera_intrinsic)
-        self.point_publisher.publish()
+        # self.mask = np.array(self.mask * 255).astype('uint8')
+        # print(self.pcd)
+        self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
+        pcd_numpy = np.asarray(self.pcd.points)
+        self.pcd.points = o3d.utility.Vector3dVector(pcd_numpy)
+        o3d.io.write_point_cloud('test.pcd', self.pcd)
+        self.point_publisher.publish(self.o3d_to_pointcloud2(self.pcd, 'segmented_point_ros'))
+        print(self.pcd.points)
         # o3d.visualization.draw_geometries([self.pcd])
         
 
+    def o3d_to_pointcloud2(self, pcd, frame_id='frasier'):
+        # pcd_numpy = np.asarray(pcd)
+        # ros_dtype = PointField.FLOAT32
+        # dtype = np.float32
+        # itemsize = np.dtype(dtype).itemsize
+        # data = pcd_numpy.astype(dtype=dtype).tobytes()
+        # fields = [PointField(name=n, offset=i*itemsize, datatype=ros_dtype, count=1) for i,n in enumerate('xyz')]
+        pc_o3d = orh.o3dpc_to_rospc(pcd, frame_id=frame_id, stamp=rospy.Time.now())
+        return pc_o3d
     
     def start(self):
         rospy.loginfo('[+] hsr_cnn_detection_node fired!')
