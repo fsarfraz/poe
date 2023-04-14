@@ -65,6 +65,7 @@ class hsr_cnn_detection(object):
         x = PointField()
         self.boxes = None
         self.mask = None
+        self.depth_image_x = None
         # self.FIELDS_XYZ = [
         #     PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
         #     PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
@@ -79,6 +80,7 @@ class hsr_cnn_detection(object):
         # self.rgb_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
         self.rgb_image = self.bridge.imgmsg_to_cv2(image_msg)
         self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='8UC1')
+        self.depth_image_x = self.bridge.imgmsg_to_cv2(depth_msg)
         # self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.depth_image))
         self.detectron_predictor = DefaultPredictor(self.detectron_cfg)
         self.detectron_output = self.detectron_predictor(self.rgb_image)
@@ -97,6 +99,8 @@ class hsr_cnn_detection(object):
         # print(self.boxes)
         (x, y) = (int(self.boxes[0]), int(self.boxes[1]))
         (w, h) = (int(self.boxes[2])-int(self.boxes[0]), int(self.boxes[3])-int(self.boxes[1]))
+        y_mid = (int(self.boxes[0]) + int(self.boxes[2])) // 2
+        x_mid = (int(self.boxes[1]) + int(self.boxes[3])) // 2
         # self.rgb_image = self.rgb_image[100:500, 100:500]
         # self.depth_image = self.depth_image[100:500, 100:500]
         # self.pinhole_camera_intrinsic.set_intrinsics(400, 400, 533.8970730178461, 534.3109677231259, 321.0284419169324, 241.1102341748379)
@@ -104,19 +108,21 @@ class hsr_cnn_detection(object):
         # self.depth_image = cv2.resize(self.depth_image, (640, 480), interpolation= cv2.INTER_LINEAR)
         # self.rgb_image = self.rgb_image
         # self.depth_image = self.depth_image
-        self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.mask))
+        self.rgb_image[x_mid-5:x_mid+5, y_mid-5:y_mid+5] = 255
+        self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.rgb_image))
         self.rgb_image = o3d.geometry.Image(self.rgb_image)
         self.depth_image = o3d.geometry.Image(self.depth_image)
         self.rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(self.rgb_image, self.depth_image, depth_scale=1, convert_rgb_to_intensity=False)
         self.pcd = o3d.geometry.PointCloud.create_from_rgbd_image(self.rgbd, self.pinhole_camera_intrinsic)
         # self.mask = np.array(self.mask * 255).astype('uint8')
         # print(self.pcd)
+        print(np.asarray(self.depth_image_x, dtype=np.float64)[x_mid, y_mid])
         self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
         pcd_numpy = np.asarray(self.pcd.points)
         self.pcd.points = o3d.utility.Vector3dVector(pcd_numpy)
         o3d.io.write_point_cloud('test.pcd', self.pcd)
         self.point_publisher.publish(self.o3d_to_pointcloud2(self.pcd, 'segmented_point_ros'))
-        print(self.pcd.points)
+        # print(self.pcd.points)
         # o3d.visualization.draw_geometries([self.pcd])
         
 
