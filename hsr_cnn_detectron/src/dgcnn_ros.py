@@ -19,7 +19,6 @@ import ros_numpy
 
 class H5Dataset(Dataset):
     def __init__(self, pnt_cld_array,label_array, num_points):
-<<<<<<< HEAD
         # pnt_cld_array = np.array([[pnt_cld_array[0]], [pnt_cld_array[0]]])
         # label = np.array([[label[0]], [[0]]])
         self.data = pnt_cld_array[:].astype('float32')
@@ -32,15 +31,6 @@ class H5Dataset(Dataset):
     def __getitem__(self, item): 
         pointcloud = self.data[item][:self.num_points]
         # print("this is pointcloud", pointcloud)
-=======
-        self.data = pnt_cld_array
-        self.label = label_array
-        self.num_points = num_points        
-    
-    def __getitem__(self, item): 
-        pointcloud = self.data[item][:self.num_points]
-        print("this is pointcloud", pointcloud)
->>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
         label = self.label[item]
         return pointcloud, label
         
@@ -153,7 +143,6 @@ def test(data, label=[[24]]):
     
     # pcd = o3d.io.read_point_cloud("test1(1).pcd")
     # pnt_cld = np.asarray(pcd.points) 
-<<<<<<< HEAD
     pnt_cld = np.array([data])
     print(pnt_cld.shape, '_____________')
     # pnt_cld = np.asarray(pnt_cld, dtype="float32")
@@ -161,14 +150,6 @@ def test(data, label=[[24]]):
     label = np.array(label)
     # label = np.asarray(label)
     # label = torch.from_numpy(label.astype('long'))
-=======
-    pnt_cld = [data]
-    pnt_cld = np.asarray(pnt_cld, dtype="float32")
-    #pnt_cld = torch.from_numpy(pnt_cld.astype("float32"))
-    label = label
-    label = np.asarray(label)
-    label = torch.from_numpy(label.astype('long'))
->>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
     num_points = 2048
     model_path = "/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/checkpoints/dgcnn_2048/models/model.t7"
     test_loader = DataLoader(H5Dataset(pnt_cld_array=pnt_cld,label_array=label,num_points=num_points))
@@ -180,39 +161,24 @@ def test(data, label=[[24]]):
 
     #Try to load models
     model = DGCNN().to(device)
-<<<<<<< HEAD
     # model = nn.DataParallel(model)
-=======
-    model = nn.DataParallel(model)
->>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
     model.load_state_dict(torch.load(model_path),strict = False)
     model = model.eval()
     test_acc = 0.0
     count = 0.0
     test_true = []
     test_pred = []
-<<<<<<< HEAD
     # label_check = [[6]]
     # label_check = torch.tensor(label_check)
     for data, labels in test_loader:
         # print("this is labels", labels)
         data, labels = data.to(device), labels.to(device).squeeze()
         print(data.shape)
-=======
-    label_check = [[6]]
-    label_check = torch.tensor(label_check)
-    for data, labels in test_loader:
-        # print("this is labels", labels)
-        data, labels = data.to(device), labels.to(device).squeeze()
->>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
         # print("this is data",data.dtype)
         data = data.permute(0, 2, 1)
         batch_size = data.size()[0]
         logits = model(data)
-<<<<<<< HEAD
         print(logits)
-=======
->>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
         preds = logits.max(dim=1)[1]
         #print(preds)
         test_true.append(labels.cpu().numpy())
@@ -262,7 +228,6 @@ if __name__ == "__main__":
     # dgcnn_node = hsr_dgcnn()
     # dgcnn_node.start()
     mesh = o3d.io.read_triangle_mesh('/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/006_mustard_bottle_textured.obj')
-<<<<<<< HEAD
     pcd = mesh.sample_points_poisson_disk(1024)
     o3d.visualization.draw_geometries([pcd])
     xyz_load = np.asarray(pcd.points)
@@ -272,9 +237,4 @@ if __name__ == "__main__":
     xyz_load /= furthest_distance
     for x in xyz_load:
         print(x)
-=======
-    pcd = mesh.sample_points_poisson_disk(2048)
-    o3d.visualization.draw_geometries([pcd])
-    xyz_load = np.asarray(pcd.points)
->>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
     test(xyz_load)
