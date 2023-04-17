@@ -43,6 +43,7 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog, DatasetCatalog
 import open3d as o3d
 from open3d_ros_helper import open3d_ros_helper as orh
+import ros_numpy
 import sys
 
 
