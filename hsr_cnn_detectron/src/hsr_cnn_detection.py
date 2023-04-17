@@ -86,7 +86,10 @@ class hsr_cnn_detection(object):
         self.y_cam = 0
         self.z_cam = 0
         self.all_point_calc = None
+<<<<<<< HEAD
         self.mask_ = None
+=======
+>>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
         # self.FIELDS_XYZ = [
         #     PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
         #     PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
@@ -110,11 +113,18 @@ class hsr_cnn_detection(object):
             self.boxes = list(self.boxes)[0].detach().cpu().numpy()
             self.mask = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_masks
             self.mask = list(self.mask)[0].detach().cpu().numpy()
+<<<<<<< HEAD
             self.mask_ = self.mask
             self.mask = cv2.cvtColor((self.mask).astype(np.uint8)*255, cv2.COLOR_GRAY2BGR)
             self.rgb_image = cv2.bitwise_and(self.rgb_image, self.mask)
             self.mask_ = cv2.cvtColor((self.mask_).astype(np.uint16)*65535, cv2.COLOR_GRAY2BGR)
             self.depth_image = cv2.bitwise_and(self.depth_image, self.mask_[:,:,0])
+=======
+            self.mask = cv2.cvtColor((self.mask*255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+            self.rgb_image = cv2.bitwise_and(self.rgb_image, self.mask)
+            self.mask = self.mask.astype(np.uint16)
+            self.depth_image = cv2.bitwise_and(self.depth_image, self.mask[:,:,0])
+>>>>>>> 4350ba31a4c4a62612d952ff382ab1bf7d53cfe6
             ### Something that is not required for now, and computation time can be decreased!
             # self.all_point_calc = []
             # for idx,pixel in enumerate(self.depth_image):
