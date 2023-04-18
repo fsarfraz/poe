@@ -163,6 +163,8 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   src/hsr_cnn_detection.py
+  src/dgcnn_ros.py
+  src/realsense_cnn_detection.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

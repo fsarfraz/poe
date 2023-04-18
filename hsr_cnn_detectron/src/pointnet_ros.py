@@ -14,9 +14,11 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import h5py
 import sklearn.metrics as metrics
 import open3d as o3d
-
-# train_h5 = sorted(glob.glob('./training*.h5'))
-# test_h5 = sorted(glob.glob('./test*.h5'))
+from cv_bridge import CvBridge, CvBridgeError
+from std_msgs.msg import Header
+from sensor_msgs.msg import Image, PointCloud, CameraInfo, PointCloud2, PointField
+import ros_numpy
+import rospy
 
 
 pnt_cld = None
@@ -25,18 +27,11 @@ label = None
 
 class H5Dataset(Dataset):
     def __init__(self, pnt_cld_array,label_array, num_points):
-        # pnt_cld_array = np.array([[pnt_cld_array[0]], [pnt_cld_array[0]]])
-        # label = np.array([[label[0]], [[0]]])
-        self.data = np.array([pnt_cld_array[:].astype('float32')])
-        # self.data_mean = np.mean(self.data, axis=0)
-        # self.data -= self.data_mean
-        self.furthest_distance = np.max(np.sqrt(np.sum(abs(self.data)**2,axis=-1)))
-        self.data /= self.furthest_distance
+        self.data = np.array([pnt_cld_array[:num_points].astype('float32')])
+        self.data_mean = np.mean(self.data, axis=0)
+        self.data -= self.data_mean
         self.label = label_array[:].astype('int64')
         self.num_points = num_points     
-        # self.data = np.concatenate(self.data, axis=0)
-        # self.label = np.concatenate(self.label, axis=0)
-        print(self.data.shape, '+++++++________+++++++')
     
     def __getitem__(self, item): 
         pointcloud = self.data[item][:self.num_points]
@@ -50,22 +45,7 @@ class H5Dataset(Dataset):
     
 
 
-def download():
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(BASE_DIR, 'data')
-    if not os.path.exists(DATA_DIR):
-        os.mkdir(DATA_DIR)
-    if not os.path.exists(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048')):
-        www = 'https://shapenet.cs.stanford.edu/media/modelnet40_ply_hdf5_2048.zip'
-        zipfile = os.path.basename(www)
-        # os.system('wget %s; unzip %s' % (www, zipfile))
-        os.system('wget %s --no-check-certificate; unzip %s' % (www, zipfile))
-        os.system('mv %s %s' % (zipfile[:-4], DATA_DIR))
-        os.system('rm %s' % (zipfile))
-
-
 def load_data(partition):
-    download()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     all_data = []
@@ -76,7 +56,6 @@ def load_data(partition):
         try:
             data = f['data'][:].astype('float32')
         except Exception as e:
-            print(h5_name, '********')
             continue
         data_mean = np.mean(data, axis=0)
         data -= data_mean
@@ -84,7 +63,6 @@ def load_data(partition):
         data /= furthest_distance
         label = f['label'][:].astype('int64')
         f.close()
-        print(data.shape)
         all_data.append(data)
         all_label.append(label)
 
@@ -126,14 +104,6 @@ class ModelNet40(Dataset):
         return self.data.shape[0]
 
 
-if __name__ == '__main__':
-    train = ModelNet40(1024)
-    test = ModelNet40(1024, 'test')
-    # for data, label in train:
-    #     print(data.shape)
-    #     print(label.shape)
-
-
 def cal_loss(pred, gold, smoothing=True):
     ''' Calculate cross entropy loss, apply label smoothing if needed. '''
 
@@ -152,20 +122,6 @@ def cal_loss(pred, gold, smoothing=True):
         loss = F.cross_entropy(pred, gold, reduction='mean')
 
     return loss
-
-
-class IOStream():
-    def __init__(self, path):
-        self.f = open(path, 'a')
-
-    def cprint(self, text):
-        print(text)
-        self.f.write(text+'\n')
-        self.f.flush()
-
-    def close(self):
-        self.f.close()
-        
 
 
 class PointNet(nn.Module):
@@ -202,18 +158,15 @@ class PointNet(nn.Module):
         return x
     
 def train():
-    train_loader = DataLoader(ModelNet40(partition='training', num_points=1024), num_workers=4,
-                              batch_size=130, shuffle=True, drop_last=True)
-    test_loader = DataLoader(ModelNet40(partition='test', num_points=1024), num_workers=4,
-                             batch_size=130, shuffle=True, drop_last=False)
+    train_loader = DataLoader(ModelNet40(partition='training', num_points=1024), num_workers=8,
+                              batch_size=40, shuffle=True, drop_last=True)
+    test_loader = DataLoader(ModelNet40(partition='test', num_points=1024), num_workers=8,
+                             batch_size=40, shuffle=True, drop_last=False)
 
     device = torch.device("cuda")
 
-    #Try to load models
-    # if args.model == 'pointnet':
+
     model = PointNet().to(device)
-    # else:
-    #     raise Exception("Not implemented")
     print(str(model))
 
     model = nn.DataParallel(model)
@@ -233,9 +186,7 @@ def train():
     best_test_acc = 0
     for epoch in range(20):
         scheduler.step()
-        ####################
         # Train
-        ####################
         train_loss = 0.0
         count = 0.0
         model.train()
@@ -263,12 +214,8 @@ def train():
                                                                                      train_true, train_pred),
                                                                                  metrics.balanced_accuracy_score(
                                                                                      train_true, train_pred))
-        # io.cprint(outstr)
         print(outstr)
-
-        ####################
         # Test
-        ####################
         test_loss = 0.0
         count = 0.0
         model.eval()
@@ -319,27 +266,89 @@ def test():
     for data, label in test_loader:
 
         data, label = data.to(device), label.to(device).squeeze()
-        # print(data.shape, '++++++++++++++')
         data = data.permute(0, 2, 1)
         batch_size = data.size()[0]
         logits = model(data)
         preds = logits.max(dim=1)[1]
         test_true.append(label.cpu().numpy())
         test_pred.append(preds.detach().cpu().numpy())
-        # print(test_true, test_pred, end='\n\n')
-    # test_true = np.concatenate(test_true)
-    # test_pred = np.concatenate(test_pred)
     test_acc = metrics.accuracy_score(test_true, test_pred)
     avg_per_class_acc = metrics.balanced_accuracy_score(test_true, test_pred)
     outstr = 'Test :: test acc: %.6f, test avg acc: %.6f'%(test_acc, avg_per_class_acc)
-    # io.cprint(outstr)
     print(outstr)
     
+    
+class hsr_pointnet(object):
+    '''
+    @To-DO
+    '''
+    def __init__(self):
+        self.rgb_image = None
+        self.depth_image = None
+        self.pcd = None
+        self.rgbd = None
+        self.bridge = CvBridge()
+        self.loop_rate = rospy.Rate(0.25)
+        self.sub = rospy.Subscriber('/segmented_point_ros', PointCloud2, callback=self.pointnet)
+        self.pointclouds = None
+
+
+    def pointnet(self, msg):
+        rospy.loginfo('Message Received')
+        self.pointclouds = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(msg)
+        self.pointclouds = np.array(self.pointclouds)
+        # print(self.pointclouds)
+        self.test(self.pointclouds)
+
+    
+    def start(self):
+        rospy.loginfo('[+] hsr_cnn_detection_node fired!')
+        rospy.spin()
+        self.bridge = CvBridge()
+        while not rospy.is_shutdown():
+            self.rate.sleep()
+            
+    def test(self, pointcloud):
+        label = np.array([6])
+        pnt_cld = pointcloud
+        test_loader = DataLoader(H5Dataset(pnt_cld_array=pnt_cld,label_array=label,num_points=1024))
+        device = torch.device("cuda")
+        #Try to load models
+        model = PointNet().to(device)
+        model = nn.DataParallel(model)
+        model.load_state_dict(torch.load('/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/model.t7'))
+        model = model.eval()
+        test_acc = 0.0
+        count = 0.0
+        test_true = []
+        test_pred = []
+        for data, label in test_loader:
+
+            data, label = data.to(device), label.to(device).squeeze()
+            data = data.permute(0, 2, 1)
+            batch_size = data.size()[0]
+            logits = model(data)
+            preds = logits.max(dim=1)[1]
+            test_true.append(label.cpu().numpy())
+            test_pred.append(preds.detach().cpu().numpy())
+        test_acc = metrics.accuracy_score(test_true, test_pred)
+        avg_per_class_acc = metrics.balanced_accuracy_score(test_true, test_pred)
+        outstr = 'Test :: test acc: %.6f, test avg acc: %.6f'%(test_acc, avg_per_class_acc)
+        print(outstr)
 
 if __name__ == '__main__':
-    mesh = o3d.io.read_triangle_mesh('/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/006_mustard_bottle_textured.obj')
-    pnt_cld = mesh.sample_points_poisson_disk(1024)
-    pnt_cld = np.asarray(pnt_cld.points)
-    label = np.array([[6]])
+    # mesh = o3d.io.read_triangle_mesh('/home/r2d2/hsr_rss_project/src/test1.pcd')
+    # pnt_cld = mesh.sample_points_poisson_disk(1024)
+    # pnt_cld = np.asarray(pnt_cld.points)
+    # label = np.array([[8]])
+    # pcd = o3d.io.read_point_cloud('/home/r2d2/hsr_rss_project/test1.pcd')
+    # o3d.visualization.draw_geometries([pcd])
+    # xyz_load = np.asarray(pcd.points)
+    # pnt_cld = xyz_load
+    # label = np.array([6])
+    # test()
     # train()
     # train()
+    rospy.init_node('hsr_pointcloud_pointnet', anonymous=True)
+    pointnet_node = hsr_pointnet()
+    pointnet_node.start()

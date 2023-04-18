@@ -139,7 +139,7 @@ class DGCNN(nn.Module):
         return x
 
 
-def test(data, label=[[24]]):
+def test(data, label=[[8]]):
     
     # pcd = o3d.io.read_point_cloud("test1(1).pcd")
     # pnt_cld = np.asarray(pcd.points) 
@@ -227,14 +227,14 @@ if __name__ == "__main__":
     # rospy.init_node('hsr_pointcloud_dgcnn', anonymous=True)
     # dgcnn_node = hsr_dgcnn()
     # dgcnn_node.start()
-    mesh = o3d.io.read_triangle_mesh('/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/006_mustard_bottle_textured.obj')
-    pcd = mesh.sample_points_poisson_disk(1024)
+    pcd = o3d.io.read_point_cloud('/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/test1.pcd')
+    # pcd = mesh.sample_points_poisson_disk(1024)
     o3d.visualization.draw_geometries([pcd])
     xyz_load = np.asarray(pcd.points)
     xyz_center = np.mean(xyz_load, axis=0)
-    xyz_load += xyz_center
+    xyz_load -= xyz_center
     furthest_distance = np.max(np.sqrt(np.sum(abs(xyz_load)**2,axis=-1)))
     xyz_load /= furthest_distance
-    for x in xyz_load:
-        print(x)
+    # for x in xyz_load:
+    #     print(x)
     test(xyz_load)

@@ -106,6 +106,7 @@ class hsr_cnn_detection(object):
         try:
             self.detectron_predictor = DefaultPredictor(self.detectron_cfg)
             self.detectron_output = self.detectron_predictor(self.rgb_image)
+            print(self.detectron_output['instances'].pred_classes)
             self.boxes = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_boxes
             self.boxes = list(self.boxes)[0].detach().cpu().numpy()
             self.mask = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_masks
@@ -146,7 +147,7 @@ class hsr_cnn_detection(object):
         # self.rgb_image = self.rgb_image[100:500, 100:500]
         # self.depth_image = self.depth_image[100:500, 100:500]
         # self.pinhole_camera_intrinsic.set_intrinsics(400, 400, 533.8970730178461, 534.3109677231259, 321.0284419169324, 241.1102341748379)
-        # self.rgb_image = cv2.resize(self.rgb_image, (640, 480), interpolation= cv2.INTER_LINEAR)
+        # self.rgb_image = cv2.resize(self.rgb_image, (640, 480), interpolation= cv2.INTER_LINeEAR)
         # self.depth_image = cv2.resize(self.depth_image, (640, 480), interpolation= cv2.INTER_LINEAR)
         # self.rgb_image = self.rgb_image
         # self.depth_image = self.depth_image
