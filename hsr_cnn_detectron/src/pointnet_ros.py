@@ -19,29 +19,31 @@ from std_msgs.msg import Header
 from sensor_msgs.msg import Image, PointCloud, CameraInfo, PointCloud2, PointField
 import ros_numpy
 import rospy
+from torch.utils.tensorboard import SummaryWriter
+
+writer = SummaryWriter(f'runs/ScanObjectNN/tensorboard')
 
 
 pnt_cld = None
 label = None
 
+test_true = []
+test_pred = []
 
 class H5Dataset(Dataset):
     def __init__(self, pnt_cld_array,label_array, num_points):
         self.data = np.array([pnt_cld_array[:num_points].astype('float32')])
-        self.data_mean = np.mean(self.data, axis=0)
-        self.data -= self.data_mean
         self.label = label_array[:].astype('int64')
         self.num_points = num_points     
     
     def __getitem__(self, item): 
         pointcloud = self.data[item][:self.num_points]
-        # print("this is pointcloud", pointcloud)
         label = self.label[item]
         return pointcloud, label
         
 
     def __len__(self):
-        return self.data.shape[0]    
+        return self.data.shape[0]
     
 
 
@@ -59,8 +61,8 @@ def load_data(partition):
             continue
         data_mean = np.mean(data, axis=0)
         data -= data_mean
-        furthest_distance = np.max(np.sqrt(np.sum(abs(data)**2,axis=-1)))
-        data /= furthest_distance
+        # furthest_distance = np.max(np.sqrt(np.sum(abs(data)**2,axis=-1)))
+        # data /= furthest_distance
         label = f['label'][:].astype('int64')
         f.close()
         all_data.append(data)
@@ -151,100 +153,10 @@ class PointNet(nn.Module):
         x = F.relu(self.bn5(self.conv5(x)))
         x = F.adaptive_max_pool1d(x, 1).squeeze().view(1, 1024)
         # x = F.adaptive_max_pool1d(x, 1).squeeze()
-        # print(x.shape, '+++++++++++ZZZZZZZZZ')
         x = F.relu(self.bn6(self.linear1(x)))
         x = self.dp1(x)
         x = self.linear2(x)
         return x
-    
-def train():
-    train_loader = DataLoader(ModelNet40(partition='training', num_points=1024), num_workers=8,
-                              batch_size=40, shuffle=True, drop_last=True)
-    test_loader = DataLoader(ModelNet40(partition='test', num_points=1024), num_workers=8,
-                             batch_size=40, shuffle=True, drop_last=False)
-
-    device = torch.device("cuda")
-
-
-    model = PointNet().to(device)
-    print(str(model))
-
-    model = nn.DataParallel(model)
-    print("Let's use", torch.cuda.device_count(), "GPUs!")
-
-    if True:
-        print("Use SGD")
-        opt = optim.SGD(model.parameters(), lr=0.001*100, momentum=0.0, weight_decay=1e-4)
-    else:
-        print("Use Adam")
-        opt = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
-
-    scheduler = CosineAnnealingLR(opt, 20, eta_min=0.001)
-    
-    criterion = cal_loss
-
-    best_test_acc = 0
-    for epoch in range(20):
-        scheduler.step()
-        # Train
-        train_loss = 0.0
-        count = 0.0
-        model.train()
-        train_pred = []
-        train_true = []
-        for data, label in train_loader:
-            data, label = data.to(device), label.to(device).squeeze()
-            data = data.permute(0, 2, 1)
-            batch_size = data.size()[0]
-            opt.zero_grad()
-            logits = model(data)
-            loss = criterion(logits, label)
-            loss.backward()
-            opt.step()
-            preds = logits.max(dim=1)[1]
-            count += batch_size
-            train_loss += loss.item() * batch_size
-            train_true.append(label.cpu().numpy())
-            train_pred.append(preds.detach().cpu().numpy())
-        train_true = np.concatenate(train_true)
-        train_pred = np.concatenate(train_pred)
-        outstr = 'Train %d, loss: %.6f, train acc: %.6f, train avg acc: %.6f' % (epoch,
-                                                                                 train_loss*1.0/count,
-                                                                                 metrics.accuracy_score(
-                                                                                     train_true, train_pred),
-                                                                                 metrics.balanced_accuracy_score(
-                                                                                     train_true, train_pred))
-        print(outstr)
-        # Test
-        test_loss = 0.0
-        count = 0.0
-        model.eval()
-        test_pred = []
-        test_true = []
-        for data, label in test_loader:
-            data, label = data.to(device), label.to(device).squeeze()
-            data = data.permute(0, 2, 1)
-            batch_size = data.size()[0]
-            logits = model(data)
-            loss = criterion(logits, label)
-            preds = logits.max(dim=1)[1]
-            count += batch_size
-            test_loss += loss.item() * batch_size
-            test_true.append(label.cpu().numpy())
-            test_pred.append(preds.detach().cpu().numpy())
-        test_true = np.concatenate(test_true)
-        test_pred = np.concatenate(test_pred)
-        test_acc = metrics.accuracy_score(test_true, test_pred)
-        avg_per_class_acc = metrics.balanced_accuracy_score(test_true, test_pred)
-        outstr = 'Test %d, loss: %.6f, test acc: %.6f, test avg acc: %.6f' % (epoch,
-                                                                              test_loss*1.0/count,
-                                                                              test_acc,
-                                                                              avg_per_class_acc)
-        # io.cprint(outstr)
-        print(outstr)
-        if test_acc >= best_test_acc:
-            best_test_acc = test_acc
-            torch.save(model.state_dict(), 'model.t7')
 
 
 def test():
@@ -252,17 +164,17 @@ def test():
     #                          batch_size=1, shuffle=False, drop_last=False)
     global label
     global pnt_cld
-    test_loader = DataLoader(H5Dataset(pnt_cld_array=pnt_cld,label_array=label,num_points=1024))
+    test_loader = DataLoader(H5Dataset(pnt_cld_array=pnt_cld,label_array=label,num_points=512))
     device = torch.device("cuda")
     #Try to load models
     model = PointNet().to(device)
     model = nn.DataParallel(model)
-    model.load_state_dict(torch.load('/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/model.t7'))
+    model.load_state_dict(torch.load('/home/r2d2/hsr_rss_project/model.t7'))
     model = model.eval()
     test_acc = 0.0
     count = 0.0
-    test_true = []
-    test_pred = []
+    global test_true
+    global test_pred
     for data, label in test_loader:
 
         data, label = data.to(device), label.to(device).squeeze()
@@ -309,19 +221,19 @@ class hsr_pointnet(object):
             self.rate.sleep()
             
     def test(self, pointcloud):
-        label = np.array([6])
-        pnt_cld = pointcloud
-        test_loader = DataLoader(H5Dataset(pnt_cld_array=pnt_cld,label_array=label,num_points=1024))
+        label = np.array([7])
+        pnt_cld = np.array(pointcloud)
+        test_loader = DataLoader(H5Dataset(pnt_cld_array=pnt_cld,label_array=label,num_points=512))
         device = torch.device("cuda")
         #Try to load models
         model = PointNet().to(device)
         model = nn.DataParallel(model)
-        model.load_state_dict(torch.load('/home/r2d2/hsr_rss_project/src/hsr_cnn_detectron/src/model.t7'))
+        model.load_state_dict(torch.load('/home/r2d2/hsr_rss_project/model.t7'))
         model = model.eval()
         test_acc = 0.0
         count = 0.0
-        test_true = []
-        test_pred = []
+        global test_true
+        global test_pred
         for data, label in test_loader:
 
             data, label = data.to(device), label.to(device).squeeze()
@@ -331,24 +243,13 @@ class hsr_pointnet(object):
             preds = logits.max(dim=1)[1]
             test_true.append(label.cpu().numpy())
             test_pred.append(preds.detach().cpu().numpy())
+            print(test_pred)
         test_acc = metrics.accuracy_score(test_true, test_pred)
         avg_per_class_acc = metrics.balanced_accuracy_score(test_true, test_pred)
         outstr = 'Test :: test acc: %.6f, test avg acc: %.6f'%(test_acc, avg_per_class_acc)
         print(outstr)
 
 if __name__ == '__main__':
-    # mesh = o3d.io.read_triangle_mesh('/home/r2d2/hsr_rss_project/src/test1.pcd')
-    # pnt_cld = mesh.sample_points_poisson_disk(1024)
-    # pnt_cld = np.asarray(pnt_cld.points)
-    # label = np.array([[8]])
-    # pcd = o3d.io.read_point_cloud('/home/r2d2/hsr_rss_project/test1.pcd')
-    # o3d.visualization.draw_geometries([pcd])
-    # xyz_load = np.asarray(pcd.points)
-    # pnt_cld = xyz_load
-    # label = np.array([6])
-    # test()
-    # train()
-    # train()
     rospy.init_node('hsr_pointcloud_pointnet', anonymous=True)
     pointnet_node = hsr_pointnet()
     pointnet_node.start()

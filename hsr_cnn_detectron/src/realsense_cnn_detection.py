@@ -105,9 +105,9 @@ class hsr_cnn_detection(object):
         try:
             self.detectron_predictor = DefaultPredictor(self.detectron_cfg)
             self.detectron_output = self.detectron_predictor(self.rgb_image)
-            self.boxes = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_boxes
+            self.boxes = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 56].pred_boxes
             self.boxes = list(self.boxes)[0].detach().cpu().numpy()
-            self.mask = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_masks
+            self.mask = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 56].pred_masks
             self.mask = list(self.mask)[0].detach().cpu().numpy()
             self.mask = cv2.cvtColor((self.mask*255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
             self.rgb_image = cv2.bitwise_and(self.rgb_image, self.mask)
