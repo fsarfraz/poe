@@ -1,16 +1,26 @@
 # Real-Time implementation of Deep Net models for point cloud object classification
+
 ### Introduction
+
 Recent research in Deep Net models in point clouds and their ability to perform classification, scene segmentation, part segmentation and grasp pose detection rather than depending on trivial methods like RANSAC and PCA and utilizing multiple methods for common objective of grasping, we plan to use only two Deep Learning models for all tasks.
+
 <hr/>
+
 ### Proposed models
 Papers like PointNet, PointNet++, Dynamic Graph CNN, etc. propose some 
 state of the art methods for object classification, though it's not clear on how to implement these models in real-world and how to bridge the sim2reeal gap efficiently.
+
 <hr/>
+
 ### 2D to 3D detection
+
 We leverage existing 2D image segmentation methods (Mask-RCNN), once the object with desired label is selected, the point clouds are generated with the depth map and rgb frame using correspondance. Further these generated point clouds can be passed to desired deep net models for either object detection, classification, segmentation or grasp detection.
-![Execution of Program in real-time](https://github.com/alpharomeo911/projecting-2d-image-to-3d/blob/main/execution.png)
+![https://github.com/alpharomeo911/projecting-2d-image-to-3d/blob/main/execution.png](https://github.com/alpharomeo911/projecting-2d-image-to-3d/blob/main/execution.png)
+
 <hr/>
-### Installation and Execution
+
+###Installation and Execution
+
 ```
 mkdir -p ~/proj-2d-3d/src
 cd ~/proj-2d-3d/src
@@ -24,6 +34,7 @@ source ~/.bashrc
 # Optional - END
 roslaunch hsr_cnn_detectron hsr_cnn_realsense.launch
 ```
+
 The above program is tailored for RealSense Cameras, you'll need to modify the camera intrinsics in the `hsr_cnn_realsense.launch` file (performing intrinsic callibration is recommended!).
 **The realsense launch file depends on RealSense ROS**
 The launch file can be modified with custom rgb and depth topics, and respective base link.
