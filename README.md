@@ -8,7 +8,7 @@ state of the art methods for object classification, though it's not clear on how
 <hr/>
 ### 2D to 3D detection
 We leverage existing 2D image segmentation methods (Mask-RCNN), once the object with desired label is selected, the point clouds are generated with the depth map and rgb frame using correspondance. Further these generated point clouds can be passed to desired deep net models for either object detection, classification, segmentation or grasp detection.
-![Execution of Program in real-time](execution.png)
+![Execution of Program in real-time](https://github.com/alpharomeo911/projecting-2d-image-to-3d/blob/main/execution.png)
 <hr/>
 ### Installation and Execution
 ```
