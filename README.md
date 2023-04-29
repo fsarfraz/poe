@@ -19,7 +19,7 @@ We leverage existing 2D image segmentation methods (Mask-RCNN), once the object 
 
 <hr/>
 
-###Installation and Execution
+### Installation and Execution
 
 ```
 mkdir -p ~/proj-2d-3d/src
@@ -38,9 +38,15 @@ roslaunch hsr_cnn_detectron hsr_cnn_realsense.launch
 The above program is tailored for RealSense Cameras, you'll need to modify the camera intrinsics in the `hsr_cnn_realsense.launch` file (performing intrinsic callibration is recommended!).
 **The realsense launch file depends on RealSense ROS**
 The launch file can be modified with custom rgb and depth topics, and respective base link.
+
 <hr/>
+
 ### Published Topics
+
 The program publishes two topics namely `/segmented` and `/segmented_point_ros`, where `/segmented` is the output from Mask-RCNN and `/segmented_point_ros` outputs the point cloud.
+
 <hr/>
+
 ### Improvements
+
 There are lot's of things which can be improved and are under development as we speak, but any feedback is appreciated via email or the issues section. 
