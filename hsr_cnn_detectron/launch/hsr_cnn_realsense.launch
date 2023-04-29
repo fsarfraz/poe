@@ -3,7 +3,11 @@
   <arg name="rgb_topic" value="/camera/color/image_raw"/>
   <arg name="depth_topic" value="/camera/depth/image_rect_raw"/>
   <arg name="base_link" value="camera_link"/>
-  <node pkg="hsr_cnn_detectron" type="hsr_cnn_detection.py" name="hsr_cnn_node" output="screen" args="$(arg rgb_topic) $(arg depth_topic) $(arg base_link)"></node>
+  <arg name="fx" value="910.8963012695312"/>
+  <arg name="fy" value="908.6121826171875"/>
+  <arg name="cx" value="639.87255859375"/>
+  <arg name="cy" value="360.7149353027344"/>
+  <node pkg="hsr_cnn_detectron" type="hsr_cnn_detection.py" name="hsr_cnn_node" output="screen" args="$(arg rgb_topic) $(arg depth_topic) $(arg base_link) $(arg fx) $(arg fy) $(arg cx) $(arg cy)"></node>
   <include file="$(find realsense2_camera)/launch/rs_camera.launch" >
     <arg name="align_depth" value="true" />
   </include>

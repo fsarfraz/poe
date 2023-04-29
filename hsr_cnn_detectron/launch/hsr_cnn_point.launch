@@ -1,6 +1,12 @@
+<?xml version="1.0"?>
 <launch>
-    <arg name="rgb_topic" value="/camera/color/image_raw"/>
-    <arg name="depth_topic" value="/camera/depth/image_rect_raw"/>
+    <arg name="rgb_topic" value="/hsrb/head_rgbd_sensor/rgb/image_raw"/>
+    <arg name="depth_topic" value="/hsrb/head_rgbd_sensor/depth_registered/image_raw"/>
     <arg name="base_link" value="head_rgbd_sensor_rgb_frame"/>
-    <node pkg="hsr_cnn_detectron" type="hsr_cnn_detection.py" name="hsr_cnn_node" args="$(arg rgb_topic) $(arg depth_topic) $(arg base_link)"></node>
+    <arg name="fx" value="533.8970730178461"/>
+    <arg name="fy" value="534.3109677231259"/>
+    <arg name="cx" value="321.0284419169324"/>
+    <arg name="cy" value="241.1102341748379"/>
+    <node pkg="hsr_cnn_detectron" type="hsr_cnn_detection.py" name="hsr_cnn_node" output="screen" args="$(arg rgb_topic) $(arg depth_topic) $(arg base_link) $(arg fx) $(arg fy) $(arg cx) $(arg cy)"></node>
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find hsr_cnn_detectron)/rviz/hsr_rviz.rviz"/>
 </launch>

@@ -52,7 +52,7 @@ class hsr_cnn_detection(object):
     '''
     @To-DO
     '''
-    def __init__(self, rgb_topic, depth_topic, base_link='head_rgbd_sensor_rgb_frame'):
+    def __init__(self, rgb_topic, depth_topic, base_link, fx, fy, cx, cy):
         self.rgb_image = None
         self.depth_image = None
         self.pcd = None
@@ -70,11 +70,12 @@ class hsr_cnn_detection(object):
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=100, slop=0.02)
         self.ts.registerCallback(self.project_2d_3d)
         self.pinhole_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
-        self.fx = 533.8970730178461
-        self.fy = 534.3109677231259
-        self.cx = 321.0284419169324
-        self.cy = 241.1102341748379
-        self.pinhole_camera_intrinsic.set_intrinsics(640, 480, 533.8970730178461, 534.3109677231259, 321.0284419169324, 241.1102341748379)
+        self.fx = fx
+        self.fy = fy
+        self.cx = cx
+        self.cy = cy
+        
+        self.pinhole_camera_intrinsic.set_intrinsics(640, 480, fx, fy, cx, cy)
         self.detectron_cfg = get_cfg()
         self.detectron_cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
         self.detectron_cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
@@ -120,42 +121,16 @@ class hsr_cnn_detection(object):
             self.rgb_image = cv2.bitwise_and(self.rgb_image, self.mask)
             self.mask_ = cv2.cvtColor((self.mask_).astype(np.uint16)*65535, cv2.COLOR_GRAY2BGR)
             self.depth_image = cv2.bitwise_and(self.depth_image, self.mask_[:,:,0])
-            ### Something that is not required for now, and computation time can be decreased!
-            # self.all_point_calc = []
-            # for idx,pixel in enumerate(self.depth_image):
-            #     for id, pix in enumerate(pixel):
-            #         if pix != 0:
-            #             self.all_point_calc.append([self.fx*(id/pix)+self.cx, self.fy*(id/pix)+self.cy , pix])
-            # self.all_point_calc = np.asarray(self.all_point_calc)
-            # apcd = o3d.geometry.PointCloud()
-            # apcd.points = o3d.utility.Vector3dVector(self.all_point_calc)
-            # self.point_publisher.publish(self.o3d_to_pointcloud2(apcd, 'segmented_point_ros'))
             (x, y) = (int(self.boxes[0]), int(self.boxes[1]))
             (w, h) = (int(self.boxes[2])-int(self.boxes[0]), int(self.boxes[3])-int(self.boxes[1]))
             y_mid = (int(self.boxes[0]) + int(self.boxes[2])) // 2
             x_mid = (int(self.boxes[1]) + int(self.boxes[3])) // 2
         except Exception as e:
-            print('No bottle', e)
+            rospy.loginfo('No bottle', e)
             (x, y) = (0,0)
             (w, h) = (0,0)
             x_mid = 0
             y_mid = 0
-        # self.mask = np.reshape(self.mask*255, (640, 480)).astype(np.uint8)
-        
-        # cv2.imshow('image', self.mask)
-        # for x in self.mask:
-        #     print(x)
-        # print(self.mask.shape)
-        # print(self.boxes)
-        
-        # self.rgb_image = self.rgb_image[100:500, 100:500]
-        # self.depth_image = self.depth_image[100:500, 100:500]
-        # self.pinhole_camera_intrinsic.set_intrinsics(400, 400, 533.8970730178461, 534.3109677231259, 321.0284419169324, 241.1102341748379)
-        # self.rgb_image = cv2.resize(self.rgb_image, (640, 480), interpolation= cv2.INTER_LINeEAR)
-        # self.depth_image = cv2.resize(self.depth_image, (640, 480), interpolation= cv2.INTER_LINEAR)
-        # self.rgb_image = self.rgb_image
-        # self.depth_image = self.depth_image
-        # self.rgb_image[x_mid-5:x_mid+5, y_mid-5:y_mid+5] = 255
         
         self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.rgb_image))
         self.rgb_image = o3d.geometry.Image(self.rgb_image)
@@ -177,7 +152,7 @@ class hsr_cnn_detection(object):
         # self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
         pcd_numpy = np.asarray(self.pcd.points)
         self.pcd.points = o3d.utility.Vector3dVector(pcd_numpy)
-        o3d.io.write_point_cloud('test1.pcd', self.pcd)
+        # o3d.io.write_point_cloud('test1.pcd', self.pcd)
         self.point_publisher.publish(self.o3d_to_pointcloud2(self.pcd, self.base_link))
         # sys.exit(0)
         # print(self.pcd.points)
@@ -207,15 +182,20 @@ if __name__ == '__main__':
     rgb_topic = None
     depth_topic = None
     base_link = None
+    fx = None
+    fy = None
+    cx = None
+    cy = None
     if len(sys.argv) < 3:
         rospy.logerr("Enough Arguments not provided, check launch file or contact the author.")
     else:
         rgb_topic = sys.argv[1]
         depth_topic = sys.argv[2]
-        try:
-            base_link = sys.argv[3]
-        except Exception as e:
-            pass
+        base_link = sys.argv[3]
+        fx = np.float64(sys.argv[4])
+        fy = np.float64(sys.argv[5])
+        cx = np.float64(sys.argv[6])
+        cy = np.float64(sys.argv[7])
     rospy.init_node('hsr_cnn_detection_node', anonymous=True)
-    cnn_node = hsr_cnn_detection(rgb_topic=rgb_topic, depth_topic=depth_topic, base_link=base_link)
+    cnn_node = hsr_cnn_detection(rgb_topic=rgb_topic, depth_topic=depth_topic, base_link=base_link, fx=fx, fy=fy, cx=cx, cy=cy)
     cnn_node.start()
