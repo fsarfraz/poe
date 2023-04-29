@@ -1,0 +1,6 @@
+<launch>
+    <arg name="rgb_topic" value="/camera/color/image_raw"/>
+    <arg name="depth_topic" value="/camera/depth/image_rect_raw"/>
+    <arg name="base_link" value="head_rgbd_sensor_rgb_frame"/>
+    <node pkg="hsr_cnn_detectron" type="hsr_cnn_detection.py" name="hsr_cnn_node" args="$(arg rgb_topic) $(arg depth_topic) $(arg base_link)"></node>
+</launch>

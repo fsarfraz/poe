@@ -1,6 +1,7 @@
 '''
 @Implementation of MASK-RCNN using Detectron2 for RSS Final Project
-@authors - Sarvesh and Farhan
+@authors - Sarvesh
+@email - sarvesh101p@gmail.com
 @affiliation - Northeastern University
 
 To-Do --> Rewrite implementation using U-Net rather than detectron2.
@@ -51,17 +52,20 @@ class hsr_cnn_detection(object):
     '''
     @To-DO
     '''
-    def __init__(self):
+    def __init__(self, rgb_topic, depth_topic, base_link='head_rgbd_sensor_rgb_frame'):
         self.rgb_image = None
         self.depth_image = None
         self.pcd = None
         self.rgbd = None
+        self.base_link = base_link
+        self.rgb_topic = rgb_topic
+        self.depth_topic = depth_topic
         self.bridge = CvBridge()
         self.loop_rate = rospy.Rate(0.25)
         self.segment_publisher = rospy.Publisher('segmented', Image, queue_size=10)
         self.point_publisher = rospy.Publisher('segmented_point_ros', PointCloud2, queue_size=10)
-        self.image_sub = message_filters.Subscriber('/hsrb/head_rgbd_sensor/rgb/image_raw', Image)
-        self.depth_sub = message_filters.Subscriber('/hsrb/head_rgbd_sensor/depth_registered/image_raw', Image)
+        self.image_sub = message_filters.Subscriber(rgb_topic, Image)
+        self.depth_sub = message_filters.Subscriber(depth_topic, Image)
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=100, slop=0.02)
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=100, slop=0.02)
         self.ts.registerCallback(self.project_2d_3d)
@@ -107,9 +111,9 @@ class hsr_cnn_detection(object):
             self.detectron_predictor = DefaultPredictor(self.detectron_cfg)
             self.detectron_output = self.detectron_predictor(self.rgb_image)
             print(self.detectron_output['instances'].pred_classes)
-            self.boxes = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 62].pred_boxes
+            self.boxes = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_boxes
             self.boxes = list(self.boxes)[0].detach().cpu().numpy()
-            self.mask = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 62].pred_masks
+            self.mask = self.detectron_output['instances'][self.detectron_output['instances'].pred_classes == 39].pred_masks
             self.mask = list(self.mask)[0].detach().cpu().numpy()
             self.mask_ = self.mask
             self.mask = cv2.cvtColor((self.mask).astype(np.uint8)*255, cv2.COLOR_GRAY2BGR)
@@ -170,17 +174,17 @@ class hsr_cnn_detection(object):
         self.x_cam = self.fx*(x_mid / self.z_cam)+self.cx
         self.y_cam = self.fy*(y_mid / self.z_cam)+self.cy
         print(self.x_cam, self.y_cam, self.z_cam)
-        self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
+        # self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
         pcd_numpy = np.asarray(self.pcd.points)
         self.pcd.points = o3d.utility.Vector3dVector(pcd_numpy)
         o3d.io.write_point_cloud('test1.pcd', self.pcd)
-        self.point_publisher.publish(self.o3d_to_pointcloud2(self.pcd, 'segmented_point_ros'))
+        self.point_publisher.publish(self.o3d_to_pointcloud2(self.pcd, self.base_link))
         # sys.exit(0)
         # print(self.pcd.points)
         # o3d.visualization.draw_geometries([self.pcd])
         
 
-    def o3d_to_pointcloud2(self, pcd, frame_id='frasier'):
+    def o3d_to_pointcloud2(self, pcd, frame_id='head_rgbd_sensor_rgb_frame'):
         # pcd_numpy = np.asarray(pcd)
         # ros_dtype = PointField.FLOAT32
         # dtype = np.float32
@@ -200,7 +204,18 @@ class hsr_cnn_detection(object):
 
 
 if __name__ == '__main__':
+    rgb_topic = None
+    depth_topic = None
+    base_link = None
+    if len(sys.argv) < 3:
+        rospy.logerr("Enough Arguments not provided, check launch file or contact the author.")
+    else:
+        rgb_topic = sys.argv[1]
+        depth_topic = sys.argv[2]
+        try:
+            base_link = sys.argv[3]
+        except Exception as e:
+            pass
     rospy.init_node('hsr_cnn_detection_node', anonymous=True)
-    cnn_node = hsr_cnn_detection()
+    cnn_node = hsr_cnn_detection(rgb_topic=rgb_topic, depth_topic=depth_topic, base_link=base_link)
     cnn_node.start()
-    

@@ -164,6 +164,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   src/hsr_cnn_detection.py
   src/dgcnn_ros.py
+  src/pointnet_ros.py
   src/realsense_cnn_detection.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

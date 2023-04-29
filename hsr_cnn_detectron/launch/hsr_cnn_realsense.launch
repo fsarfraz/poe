@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="rgb_topic" value="/camera/color/image_raw"/>
+  <arg name="depth_topic" value="/camera/depth/image_rect_raw"/>
+  <arg name="base_link" value="camera_link"/>
+  <node pkg="hsr_cnn_detectron" type="hsr_cnn_detection.py" name="hsr_cnn_node" output="screen" args="$(arg rgb_topic) $(arg depth_topic) $(arg base_link)"></node>
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch" >
+    <arg name="align_depth" value="true" />
+  </include>
+</launch>
