@@ -108,7 +108,7 @@ catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES hsr_cnn_detectron
  CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs
- DEPENDS system_lib
+#  DEPENDS system_lib
 )
 
 ###########
