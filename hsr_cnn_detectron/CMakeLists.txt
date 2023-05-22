@@ -12,6 +12,9 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   sensor_msgs
+  tf2_ros
+  tf2_geometry_msgs
+  tf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,7 +110,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES hsr_cnn_detectron
- CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs
+ CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs tf2_ros tf2_geometry_msgs tf
 #  DEPENDS system_lib
 )
 

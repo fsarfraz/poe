@@ -46,7 +46,9 @@ import open3d as o3d
 from open3d_ros_helper import open3d_ros_helper as orh
 import ros_numpy
 import sys
-
+import tf2_ros
+import tf2_geometry_msgs
+import tf
 
 class hsr_cnn_detection(object):
     '''
@@ -126,34 +128,38 @@ class hsr_cnn_detection(object):
             y_mid = (int(self.boxes[0]) + int(self.boxes[2])) // 2
             x_mid = (int(self.boxes[1]) + int(self.boxes[3])) // 2
         except Exception as e:
-            rospy.loginfo('No bottle', e)
-            (x, y) = (0,0)
-            (w, h) = (0,0)
-            x_mid = 0
-            y_mid = 0
-        
-        self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.rgb_image))
-        self.rgb_image = o3d.geometry.Image(self.rgb_image)
-        self.depth_image = o3d.geometry.Image(self.depth_image)
-        self.rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(self.rgb_image, self.depth_image, convert_rgb_to_intensity=False)
-        self.pcd = o3d.geometry.PointCloud.create_from_rgbd_image(self.rgbd, self.pinhole_camera_intrinsic)
-        # self.mask = np.array(self.mask * 255).astype('uint8')
-        # print(self.pcd)
-        # print(np.asarray(self.depth_image_x, dtype=np.float64)[x_mid, y_mid])
-        '''
-        Rectify this formula to and test with o3d -
-        ((u - c_x) * d) / f_x
-        ((v - c_y) * d) / f_y
-        '''
-        self.z_cam = np.asarray(self.depth_image_x, dtype=np.float64)[x_mid, y_mid]
-        self.x_cam = self.fx*(x_mid / self.z_cam)+self.cx
-        self.y_cam = self.fy*(y_mid / self.z_cam)+self.cy
-        print(self.x_cam, self.y_cam, self.z_cam)
-        # self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
-        pcd_numpy = np.asarray(self.pcd.points)
-        self.pcd.points = o3d.utility.Vector3dVector(pcd_numpy)
-        # o3d.io.write_point_cloud('test1.pcd', self.pcd)
-        self.point_publisher.publish(self.o3d_to_pointcloud2(self.pcd, self.base_link))
+            rospy.logwarn(e)
+            return
+            # rospy.loginfo('No bottle', e)
+            # (x, y) = (0,0)
+            # (w, h) = (0,0)
+            # x_mid = 0
+            # y_mid = 0
+        try:
+            self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.rgb_image))
+            self.rgb_image = o3d.geometry.Image(self.rgb_image)
+            self.depth_image = o3d.geometry.Image(self.depth_image)
+            self.rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(self.rgb_image, self.depth_image, convert_rgb_to_intensity=False)
+            self.pcd = o3d.geometry.PointCloud.create_from_rgbd_image(self.rgbd, self.pinhole_camera_intrinsic)
+            # self.mask = np.array(self.mask * 255).astype('uint8')
+            # print(self.pcd)
+            # print(np.asarray(self.depth_image_x, dtype=np.float64)[x_mid, y_mid])
+            '''
+            Rectify this formula to and test with o3d -
+            ((u - c_x) * d) / f_x
+            ((v - c_y) * d) / f_y
+            '''
+            self.z_cam = np.asarray(self.depth_image_x, dtype=np.float64)[x_mid, y_mid]
+            self.x_cam = self.fx*(x_mid / self.z_cam)+self.cx
+            self.y_cam = self.fy*(y_mid / self.z_cam)+self.cy
+            print(self.x_cam, self.y_cam, self.z_cam)
+            # self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
+            pcd_numpy = np.asarray(self.pcd.points)
+            self.pcd.points = o3d.utility.Vector3dVector(pcd_numpy)
+            # o3d.io.write_point_cloud('test1.pcd', self.pcd)
+            self.point_publisher.publish(self.o3d_to_pointcloud2(self.pcd, self.base_link))
+        except Exception as e:
+            rospy.logwarn(e)
         # sys.exit(0)
         # print(self.pcd.points)
         # o3d.visualization.draw_geometries([self.pcd])
