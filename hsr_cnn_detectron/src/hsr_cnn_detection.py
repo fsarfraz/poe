@@ -1,7 +1,7 @@
 '''
 @Implementation of MASK-RCNN using Detectron2 for RSS Final Project
-@authors - Sarvesh
-@email - sarvesh101p@gmail.com
+@authors - Sarvesh Prajapati & Farhan Sarfraz
+@email - sarvesh101p@gmail.com, far.sarfraz98@gmail.com
 @affiliation - Northeastern University
 
 To-Do --> Rewrite implementation using U-Net rather than detectron2.
