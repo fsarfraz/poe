@@ -69,7 +69,6 @@ class hsr_cnn_detection(object):
         self.image_sub = message_filters.Subscriber(rgb_topic, Image)
         self.depth_sub = message_filters.Subscriber(depth_topic, Image)
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=100, slop=0.02)
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=100, slop=0.02)
         self.ts.registerCallback(self.project_2d_3d)
         self.pinhole_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic()
         self.fx = fx
@@ -94,13 +93,7 @@ class hsr_cnn_detection(object):
         self.z_cam = 0
         self.all_point_calc = None
         self.mask_ = None
-        # self.FIELDS_XYZ = [
-        #     PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
-        #     PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
-        #     PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
-        # ]
-        # self.FIELDS_XYZRGB = self.FIELDS_XYZ + \
-        #     [PointField(name='rgb', offset=12, datatype=PointField.UINT32, count=1)]
+
 
 
     def project_2d_3d(self, image_msg, depth_msg):
@@ -141,19 +134,7 @@ class hsr_cnn_detection(object):
             self.depth_image = o3d.geometry.Image(self.depth_image)
             self.rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(self.rgb_image, self.depth_image, convert_rgb_to_intensity=False)
             self.pcd = o3d.geometry.PointCloud.create_from_rgbd_image(self.rgbd, self.pinhole_camera_intrinsic)
-            # self.mask = np.array(self.mask * 255).astype('uint8')
-            # print(self.pcd)
-            # print(np.asarray(self.depth_image_x, dtype=np.float64)[x_mid, y_mid])
-            '''
-            Rectify this formula to and test with o3d -
-            ((u - c_x) * d) / f_x
-            ((v - c_y) * d) / f_y
-            '''
-            self.z_cam = np.asarray(self.depth_image_x, dtype=np.float64)[x_mid, y_mid]
-            self.x_cam = self.fx*(x_mid / self.z_cam)+self.cx
-            self.y_cam = self.fy*(y_mid / self.z_cam)+self.cy
-            print(self.x_cam, self.y_cam, self.z_cam)
-            # self.pcd = self.pcd.transform(([1,0,0,0], [0,-1,0,0], [0,0,-1,0], [0,0,0,1]))
+            
             pcd_numpy = np.asarray(self.pcd.points)
             self.pcd.points = o3d.utility.Vector3dVector(pcd_numpy)
             # o3d.io.write_point_cloud('test1.pcd', self.pcd)
@@ -166,12 +147,6 @@ class hsr_cnn_detection(object):
         
 
     def o3d_to_pointcloud2(self, pcd, frame_id='head_rgbd_sensor_rgb_frame'):
-        # pcd_numpy = np.asarray(pcd)
-        # ros_dtype = PointField.FLOAT32
-        # dtype = np.float32
-        # itemsize = np.dtype(dtype).itemsize
-        # data = pcd_numpy.astype(dtype=dtype).tobytes()
-        # fields = [PointField(name=n, offset=i*itemsize, datatype=ros_dtype, count=1) for i,n in enumerate('xyz')]
         pc_o3d = orh.o3dpc_to_rospc(pcd, frame_id=frame_id, stamp=rospy.Time.now())
         return pc_o3d
     
