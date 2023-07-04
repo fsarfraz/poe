@@ -84,7 +84,6 @@ class hsr_cnn_detection(object):
         self.detectron_predictor = None
         self.detectron_output = None
         self.detectron_visualizer = None
-        x = PointField()
         self.boxes = None
         self.mask = None
         self.depth_image_x = None
@@ -98,11 +97,8 @@ class hsr_cnn_detection(object):
 
     def project_2d_3d(self, image_msg, depth_msg):
         rospy.loginfo('Message Received')
-        # self.rgb_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
         self.rgb_image = self.bridge.imgmsg_to_cv2(image_msg)
         self.depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='16UC1')
-        self.depth_image_x = self.bridge.imgmsg_to_cv2(depth_msg)
-        # self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.depth_image))
         try:
             self.detectron_predictor = DefaultPredictor(self.detectron_cfg)
             self.detectron_output = self.detectron_predictor(self.rgb_image)
@@ -116,18 +112,10 @@ class hsr_cnn_detection(object):
             self.rgb_image = cv2.bitwise_and(self.rgb_image, self.mask)
             self.mask_ = cv2.cvtColor((self.mask_).astype(np.uint16)*65535, cv2.COLOR_GRAY2BGR)
             self.depth_image = cv2.bitwise_and(self.depth_image, self.mask_[:,:,0])
-            (x, y) = (int(self.boxes[0]), int(self.boxes[1]))
-            (w, h) = (int(self.boxes[2])-int(self.boxes[0]), int(self.boxes[3])-int(self.boxes[1]))
-            y_mid = (int(self.boxes[0]) + int(self.boxes[2])) // 2
-            x_mid = (int(self.boxes[1]) + int(self.boxes[3])) // 2
+           
         except Exception as e:
             rospy.logwarn(e)
             return
-            # rospy.loginfo('No bottle', e)
-            # (x, y) = (0,0)
-            # (w, h) = (0,0)
-            # x_mid = 0
-            # y_mid = 0
         try:
             self.segment_publisher.publish(self.bridge.cv2_to_imgmsg(self.rgb_image))
             self.rgb_image = o3d.geometry.Image(self.rgb_image)
